@@ -23,7 +23,7 @@ int main(void){
         unsigned int distance_display = (int) distance * 10;
         unsigned int segDisplay = 0x0;
         int i = 0;
-        while (distance_display != 0){
+        while (i != 32){
             unsigned char lsd = distance_display % 10;
             segDisplay += (signArray[lsd] << i);
             i += 8;
