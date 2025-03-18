@@ -9,12 +9,24 @@ Base        Data bits
 +8          Interrupt Mask
 +C          Edge Capture bits
 */
-
+//Each bit in the Data register can be configured as an input by setting the corresponding bit in the Direction register to 0 
+//or as an output by setting this bit position to 1
 #define JP1_BASE                0xFF200060
 #define JP2_BASE                0xFF200070
 #define TIMER1_BASE             0xFF202000
 #define TIMER2_BASE             0xFF202020
+#define HEX3_HEX0_BASE          0xFF200020
+#define Trigger                 0
+#define Echo                    1
 
+#include <math.h>
+#include <stdlib.h>
 
+void ultrasonic_init();
+void ultrasonic_CountDown_start();
+void ultrasonic_count_10us();
+void ultrasonic_timer_stop();
+void ultrasonic_send_wave();
+double ultrasonic_compute_distance_cm();
 
 #endif
