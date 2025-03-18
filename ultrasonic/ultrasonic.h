@@ -23,10 +23,12 @@ Base        Data bits
 #include <stdlib.h>
 
 void ultrasonic_init();
+void ultrasonic_send_wave();
+double ultrasonic_compute_distance_cm();
+
+//Should not call these functions outside of ultrasonic.c. still included in the .h file
 void ultrasonic_CountDown_start();
 void ultrasonic_count_10us();
 void ultrasonic_timer_stop();
-void ultrasonic_send_wave();
-double ultrasonic_compute_distance_cm();
 
 #endif

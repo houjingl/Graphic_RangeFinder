@@ -41,6 +41,7 @@ void ultrasonic_send_wave()
     *(parallel_port1_base) |= (1 << Trigger);
     ultrasonic_count_10us();
     while((*timer_base & 0x1) == 0);
+    ultrasonic_timer_stop();
     *(parallel_port1_base) &= ~(1 << Trigger);
 }
 
