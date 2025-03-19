@@ -45,7 +45,7 @@ void ultrasonic_send_wave()
     *(parallel_port1_base) &= ~(1 << Trigger);
 }
 
-double ultrasonic_compute_distance_cm()
+int ultrasonic_compute_distance_cm()
 {
     volatile int* parallel_port1_base = (int*) JP1_BASE;
     volatile int* timer_base = (int*) TIMER1_BASE;
@@ -53,11 +53,12 @@ double ultrasonic_compute_distance_cm()
     while(((*parallel_port1_base & (1 << Echo)) >> Echo) == 0); //wait when echo is not received;
     ultrasonic_CountDown_start();
     while(((*parallel_port1_base & (1 << Echo)) >> Echo)); //wait when echo is high
-    ultrasonic_timer_stop();
+    *(timer_base + 4) = 0x1; //perform write operation to store in snopshot
     unsigned int timer_current_low = *(timer_base + 4);
     unsigned int timer_current_high = *(timer_base + 5);
+    ultrasonic_timer_stop();
     unsigned int timer_current = timer_current_low + timer_current_high << 16;
-    distance = ((0xFFFFFFFF - timer_current) / 100000000) * (170) / 100.0; //Distance in cm
-    return round(distance * 10) / 10.0; 
+    distance = ((0xFFFFFFFF - timer_current) / 100000000) * (170) * 100.0; //Distance in cm
+    return (int) distance; 
     //round to 1 decimal places
 }

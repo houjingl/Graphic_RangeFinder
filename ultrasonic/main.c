@@ -19,15 +19,14 @@ int main(void){
 
     while (1){
         ultrasonic_send_wave();
-        double distance = ultrasonic_compute_distance_cm();
-        unsigned int distance_display = (int) distance * 10;
+        int distance = ultrasonic_compute_distance_cm();
         unsigned int segDisplay = 0x0;
         int i = 0;
         while (i != 32){
-            unsigned char lsd = distance_display % 10;
+            unsigned char lsd = distance % 10;
             segDisplay += (signArray[lsd] << i);
             i += 8;
-            distance_display /= 10;
+            distance /= 10;
         }
         *seg_base = segDisplay;
 

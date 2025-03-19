@@ -24,7 +24,7 @@ Base        Data bits
 
 void ultrasonic_init();
 void ultrasonic_send_wave();
-double ultrasonic_compute_distance_cm();
+int ultrasonic_compute_distance_cm();
 
 //Should not call these functions outside of ultrasonic.c. still included in the .h file
 void ultrasonic_CountDown_start();
