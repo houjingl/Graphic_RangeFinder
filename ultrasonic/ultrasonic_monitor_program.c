@@ -6,7 +6,6 @@
 #define Trigger                 0
 #define Echo                    1
 
-
 #define SEG_0 0x3F  // 0b00111111: segments 0..5 on, 6 off
 #define SEG_1 0x06  // 0b00000110: segments 1,2 on
 #define SEG_2 0x5B  // 0b01011011
@@ -18,6 +17,7 @@
 #define SEG_8 0x7F  // 0b01111111
 #define SEG_9 0x6F  // 0b01101111
 
+unsigned char signArray[] = {SEG_0, SEG_1, SEG_2, SEG_3, SEG_4, SEG_5, SEG_6, SEG_7, SEG_8, SEG_9};
 
 void ultrasonic_init()
 {
@@ -79,13 +79,11 @@ int ultrasonic_compute_distance_cm()
     unsigned int timer_current = timer_current_low + (timer_current_high << 16);
     *(store + 2) = timer_current;
     *(store + 3) = *(timer_base + 2) + ((*(timer_base + 3) << 16));
-    distance = ((double)(0xFFFFFFFF - timer_current) / 100000000.0) * (170) * 100.0; 
+    distance = ((0xFFFFFFFF - timer_current) / 100000000.0) * (170) * 100.0; 
     //Distance in cm
     return (int) distance; 
     //round to 1 decimal places
 }
-
-unsigned char signArray[] = {SEG_0, SEG_1, SEG_2, SEG_3, SEG_4, SEG_5, SEG_6, SEG_7, SEG_8, SEG_9};
 
 int main(void){
     ultrasonic_init();
