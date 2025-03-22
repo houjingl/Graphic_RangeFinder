@@ -17,7 +17,8 @@ void timer2_start()
 void timer2_stop()
 {
     int* timer2_base = (int*) TIMER2_BASE;
-    *(timer2_base + 1) = 0b1011;
+    *timer2_base = 0x0;
+    *(timer2_base + 1) = 0b1010;
 }
 
 void timer2_ISR()
@@ -38,14 +39,14 @@ void timer2_ISR()
     
 }
 
-void ISR_HANDLER()
+void __attribute__((interrupt("machine"))) ISR_HANDLER(void) //declare this subroutine as an ISR
 {
     int mcause_value = 0x0;
     __asm__ volatile ("csrr %0, mcause" : "=r"(mcause_value));
-    mcause_value &= ~(1 << 31);
-    if (mcause_value == TIMER2_IRQ){
+    int * temp_stack = 0x20000;
+    *(temp_stack + 1) = mcause_value;
+    if (mcause_value == (TIMER2_IRQ + 0x80000000)){
         timer2_ISR();
-        timer2_start();
     }
 
 }
@@ -72,11 +73,11 @@ void timer2_interrupt_init()
 void timer2_init()
 {
     int* timer2_base = (int*) TIMER2_BASE;
-    int timer2_content = 1000;
+    int timer2_content = 100;
     *(timer2_base) = 0x0;
     *(timer2_base + 1) = 0b1011;
     *(timer2_base + 2) = timer2_content;
-    *(timer2_base + 3) = 0x0;
+    *(timer2_base + 3) = timer2_content >> 16;
     timer2_interrupt_init();
 }
 
