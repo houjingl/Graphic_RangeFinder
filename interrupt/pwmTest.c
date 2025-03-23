@@ -11,7 +11,7 @@
 int count = 0;
 int count2 = 0;
 //double pwm_duty_ratio = 0.5; //default 50% duty ratio
-int pulse_width = 100;
+volatile int pulse_width = 100; //must declare this variable as volatile to avoid compiler optimization
 
 void timer2_start()
 {
@@ -36,10 +36,10 @@ void timer2_ISR()
     count %= TS;
     if (count < pulse_width){
         //set corresponding pin to 1
-        *jp1 |= (1<<Servo);
+        *jp1 |= (1 << Servo);
     } else {
         //set corresponding pin to 0
-        *jp1 &= ~(1<<Servo);
+        *jp1 &= ~(1 << Servo);
     }
     timer2_start();
     count2 ++;
