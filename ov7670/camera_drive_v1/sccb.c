@@ -128,7 +128,7 @@ uint8_t SCCB_ReadByte()
     return retByte;
 }
 
-uint8_t SCCB_Reg_Write(uint8_t data, uint8_t reg_addr)
+uint8_t SCCB_Reg_Write(uint8_t reg_addr, uint8_t data)
 {
     SCCB_start();
     if(SCCB_SendByte(OV7670_write_addr)){

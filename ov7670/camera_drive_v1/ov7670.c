@@ -119,6 +119,9 @@ void ov7670_init()
 
     //reg config
     OV7670_Config_Reg();
+
+    //interrupt init
+    ov7670_interrupt_init();
 }
 
 void OV7670_Config_Reg(){
