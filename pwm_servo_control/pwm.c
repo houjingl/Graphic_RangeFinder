@@ -77,13 +77,4 @@ void __attribute__((interrupt("machine"))) ISR_HANDLER(void) //declare this subr
 
 }
 */
-int main(){
-    servo_pwm_init();
-    servo_pwm_start();
-    volatile int* jp1Base = (int*) JP1_BASE;
-    *(jp1Base+1) |= (1<<Servo);    
-    while(1){
-
-    }
-}
 
