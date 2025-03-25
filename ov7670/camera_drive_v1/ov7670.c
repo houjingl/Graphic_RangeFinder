@@ -5,11 +5,90 @@ volatile int* ov7670_JP2_addr = (int*) JP2_BASE;
 /*
 config XCLK -> using timer 1, set a 16 mhz clock, enable timer1 interrupt
 turn on PCLK, VS, HS interrupt mask
-l
+load JP2 interrput and timer 1 interrupt
 */
+void ov7670_xclk_start()
+{
+    volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    *xclk_base = 0x0;
+    *(xclk_base) = 0b0111;
+}
+
+void ov7670_xclk_stop()
+{
+    volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    *xclk_base = 0x0;
+    *(xclk_base + 1) = 0b1010;
+}
+
+void ov7670_xclk_ISR()
+{
+    ov7670_xclk_stop();
+    volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    //toggle XCLK
+    if (*ov7670_JP2_addr & (1 << XCLK)){
+        //if XCLK is 1
+        *(ov7670_JP2_addr) &= ~(1 << XCLK);
+    } else {
+        //XCLK is 0
+        *(ov7670_JP2_addr) |= (1 << XCLK);
+    }
+    ov7670_xclk_start();
+}
+
 void ov7670_interrupt_init()
 {
+    //interrupt device level set up
+    //setting XCLK
+    volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    volatile int xclk_irq = XCLK_IRQ;
+    volatile int jp2_irq = JP2_IRQ;
+    int xclk_timer1_content = 5; //every 5 clock cycles toggle
+    *(xclk_base + 2) = xclk_timer1_content;
+    *(xclk_base + 3) = 0x0;
+    ov7670_xclk_start();
+
+    //setting JP2 interrupt mask
+    *(ov7670_JP2_addr + 2) |= (1 << PCLK) | (1 << HSYNC) | (1 << VSYNC);
+    //clear edge capture, writing 1
+    *(ov7670_JP2_addr + 3) |= 0xFFFFFFFF;
     
+    int mstatus_value, IRQ_value, mtvec_value;
+    mstatus_value = 0b1000; //disable global interrupt
+    __asm__ volatile ("csrc mstatus, %0" :: "r"(mstatus_value));
+
+    __asm__ volatile ("csrr %0, mie" : "=r"(IRQ_value));
+    IRQ_value |= (1 << XCLK_IRQ) | (1 << JP2_IRQ);
+    __asm__ volatile ("csrs mie, %0" :: "r"(IRQ_value));
+    //Loading mtvec in main
+    //mtvec_value = (int) &ISR_HANDLER; //load mtvec
+    //__asm__ volatile ("csrw mtvec, %0" :: "r"(mtvec_value));
+
+    //enable global interrupt
+    __asm__ volatile ("csrs mstatus, %0" :: "r"(mstatus_value));
+}
+
+void ov7670_JP2_ISR()
+{
+    //Important ISR, Determine the pixel transmission
+    /*
+    General Steps:
+    1. check which pin caused the interrupt
+        VS -> Vsync is completed, ok to render on VGA display  
+            -> write 1 into front buffer
+            -> reset y pos and x pos to 0 0
+        HS -> switch line y ++
+           -> reset PCLK buffer index
+        PCLk -> receive pixel info
+             -> need a buffer of size >= 2
+             -> PCLK buffer index ++
+             if PCLK % 2 == 0
+                -> pixel map to current x, y loc
+                -> x ++
+                -> PCLK %= 2
+    2. reset curresponding edge trigger pin
+    */
+   
 }
 
 //initialization process
@@ -19,7 +98,6 @@ reset camera
 set camera XCLK timer output
 turn on PCLK, VS, HS interrupt mask, and load 
 */
-
 
 void ov7670_init()
 {
