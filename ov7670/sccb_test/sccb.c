@@ -2,7 +2,8 @@
 
 volatile int* sccb_JP2_port_addr = (int*) JP2_BASE;
 
-void delay_us(unsigned int microseconds) {
+void delay_us(unsigned int microseconds) 
+{
     volatile unsigned int i;
     while (microseconds--) {
         // For a 100 MHz clock, ideally, you need ~100 cycles for 1µs delay.

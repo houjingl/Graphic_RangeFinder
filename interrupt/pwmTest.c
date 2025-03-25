@@ -10,7 +10,6 @@
 
 int count = 0;
 int count2 = 0;
-//double pwm_duty_ratio = 0.5; //default 50% duty ratio
 volatile int pulse_width = 100; //must declare this variable as volatile to avoid compiler optimization
 
 void timer2_start()

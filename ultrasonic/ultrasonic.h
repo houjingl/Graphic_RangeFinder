@@ -1,7 +1,7 @@
 #ifndef __ULTRASONIC__
 #define __ULTRASONIC__
 //DE1 Soc equips with two extension ports - JP1 and JP2
-//Each corresponds with a 32-bit Register
+//Each corresponds to a 32-bit Register
 //JP1 is 0xFF200060, and for JP2 is 0xFF200070
 /*
 Base        Data bits
@@ -12,7 +12,6 @@ Base        Data bits
 //Each bit in the Data register can be configured as an input by setting the corresponding bit in the Direction register to 0 
 //or as an output by setting this bit position to 1
 #define JP1_BASE                0xFF200060
-#define JP2_BASE                0xFF200070
 #define TIMER1_BASE             0xFF202000
 #define TIMER2_BASE             0xFF202020
 #define HEX3_HEX0_BASE          0xFF200020
