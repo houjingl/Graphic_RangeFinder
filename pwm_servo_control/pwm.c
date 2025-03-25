@@ -34,8 +34,6 @@ void servo_pwm_ISR()
     servo_pwm_start();
 }
 
-
-
 void servo_pwm_interrupt_init()
 {   
     //THIS FUNCTION ONLY OPERATES THE GENERAL INTERRUPT CONTROL REGs
@@ -44,7 +42,8 @@ void servo_pwm_interrupt_init()
     int mstatus_value, IRQ_value, mtvec_value;
     mstatus_value = 0b1000; //disable global interrupt
     __asm__ volatile ("csrc mstatus, %0" :: "r"(mstatus_value));
-
+    
+    __asm__ volatile ("csrr %0, mie" : "=r"(IRQ_value));
     IRQ_value |= (1 << servo_pwm_IRQ); //set servo_pwm IRQ to mie
     __asm__ volatile ("csrs mie, %0" :: "r"(IRQ_value));
     //Loading mtvec in main

@@ -7,6 +7,8 @@
 #endif
 
 #define XCLK_TIMER_BASE         0xFF202000
+#define JP2_IRQ                 28
+#define XCLK_IRQ                16 //Timer 1 IRQ
 
 #ifndef SDA
 #define SDA                     0
