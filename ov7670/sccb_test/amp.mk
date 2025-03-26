@@ -44,10 +44,10 @@ LDFLAGS		:= $(USERLDFLAGS) $(ARCHLDFLAGS)
 OCFLAGS		:= -O srec
 
 # Files
-ELF		:= sccb_test
+ELF		:= sccb
 ELFEXT		:= .elf
 HDRS		:=
-SRCS		:= sccb_test.c sccb.c
+SRCS		:= sccb.c sccb_test.c
 OBJS		:= $(patsubst %, %.o, $(SRCS))
 
 ############################################
