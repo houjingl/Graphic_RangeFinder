@@ -10,8 +10,8 @@
     </system>
     <program type="C Program">
         <source_files>
-            <source_file>sccb_test.c</source_file>
             <source_file>sccb.c</source_file>
+            <source_file>sccb_test.c</source_file>
         </source_files>
         <options>
             <compiler_flags>-g -O1 -ffunction-sections -fverbose-asm -fno-inline -gdwarf-2</compiler_flags>

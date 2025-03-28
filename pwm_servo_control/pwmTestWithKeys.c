@@ -75,6 +75,9 @@ void __attribute__((interrupt("machine"))) ISR_HANDLER(void) //declare this subr
     if (mcause_value == (TIMER2_IRQ + 0x80000000)){
         timer2_ISR();
     }
+else if (mcause_value == (KEY_IRQ+ 0x80000000)){
+    key_ISR();
+}
 
 }
 
