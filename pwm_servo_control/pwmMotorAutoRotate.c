@@ -141,7 +141,7 @@ void timer2_ISR()
     count_rotate %= TS * 2;
     if(!count_rotate){
         ultrasonic_send_wave();
-        distance = ultrasonic_compute_distance_cm();
+        
         volatile int* led_base = 0xFF200000;
         *led_base ^= 0x1;
     	if(pulse_width <= 50) {

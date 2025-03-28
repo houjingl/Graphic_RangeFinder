@@ -105,6 +105,6 @@ int main(void){
         }
         *seg_base = segDisplay;
 
-        for (int j = 0; j < 10000000; j ++){/* A very simple 1s delay*/}
+        for (int j = 0; j < 1000; j ++){/* A very simple 1s delay*/}
     }
 }
