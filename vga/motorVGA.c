@@ -58,6 +58,24 @@ void clear_screen() {
 
 #define TERMS 10
 
+// Function to calculate power of x^n
+double power(double x, int n) {
+  double result = 1.0;
+  for (int i = 0; i < n; i++) {
+    result *= x;
+  }
+  return result;
+}
+
+// Function to calculate factorial of n
+long long factorial(int n) {
+  long long result = 1;
+  for (int i = 2; i <= n; i++) {
+    result *= i;
+  }
+  return result;
+}
+
 // Function to compute sin(x) using Taylor series
 double sin_taylor(double x) {
   double sum = 0.0;
@@ -148,19 +166,21 @@ void draw_line(int x0, int y0, int x1, int y1, short int color) {
 int calculate_x(distance, angle) {
   // r=150; max 2 meters
   int x;
+  distance *= 2;
   if (distance >= 200) {
     distance = 200;
   }
-  x = (int)distance * 0.75 * cos_taylor(angle / 170.0 * PI) + 160;
+  x = (int)distance * 0.75 * cos_taylor(angle/180.0 * PI) + 160;
   return x;
 }
 
 int calculate_y(distance, angle) {
   int y;
+  distance *= 2;
   if (distance >= 200) {
     distance = 200;
   }
-  y = (int)229 - distance * 0.75 * sin_taylor(angle / 170.0 * PI);
+  y = (int)229 - distance * 0.75 * sin_taylor(angle/180.0 * PI);
   return y;
 }
 
@@ -285,7 +305,7 @@ void timer2_ISR() {
   if (!count_rotate) {
     if (pulse_width <= 50) {
       fbi = 1;
-    } else if (pulse_width >= 240) {
+    } else if (pulse_width >= 230) {
       fbi = -1;
     }
     pulse_width += fbi;
@@ -352,8 +372,8 @@ int main() {
   *(pixel_ctrl_ptr + 1) = pixel_buffer_start;  // setting the back buffer to be
                                                // the same as front buffer
 
-  int distance_x[171] = {0};
-  int distance_y[171] = {0};
+  int distance_x[181] = {0};
+  int distance_y[181] = {0};
 
   clear_screen();
 
