@@ -296,7 +296,7 @@ void draw_letter(char c, int offset_x, int offset_y) {
                 }
                 // Bold horizontal bar in the middle.
                 int bar_y = offset_y + LETTER_HEIGHT / 2;
-                for (col = 0; col < LETTER_WIDTH; col++) {
+                for (col = 5; col < LETTER_WIDTH - 5; col++) {
                     for (row = 0; row < BOLD_THICKNESS; row++) {
                         plot_bold_pixel(offset_x + col, bar_y + row, 0xFFFF, BOLD_THICKNESS);
                     }
