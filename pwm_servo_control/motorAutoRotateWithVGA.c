@@ -30,8 +30,8 @@ volatile int pixel_buffer_start;       // global variable
 volatile short int Buffer1[240][512];  // 240 rows, 512 (320 + padding) columns
 volatile short int Buffer2[240][512];
 
-int calculate_x(int distance, int angle);
-int calculate_y(int distance, int angle);
+int calculate_x(unsigned int distance, unsigned int angle);
+int calculate_y(unsigned int distance, unsigned int angle);
 void plot_pixel(int x, int y, short int line_color);
 void wait_for_vsync();
 void clear_screen();
@@ -55,7 +55,7 @@ void wait_for_vsync() {
 void clear_screen() {
   for (int i = 0; i < 240; i++) {
     for (int j = 0; j < 320; j++) {
-      plot_pixel(j, i, 0x0);
+      plot_pixel(j, i, 0xFFFF);
     }
   }
 }
@@ -65,6 +65,19 @@ void swap(int* a, int* b) {
   *b = *a;
   *a = temp;
 }
+
+void draw_box(int x, int y, short int color){
+  plot_pixel(x, y, color);
+  plot_pixel(x, y + 1, color);
+  plot_pixel(x, y - 1, color);
+  plot_pixel(x + 1, y, color);
+  plot_pixel(x + 1, y - 1, color);
+  plot_pixel(x + 1, y + 1, color);
+  plot_pixel(x - 1, y, color);
+  plot_pixel(x - 1, y + 1, color);
+  plot_pixel(x - 1, y - 1, color);
+
+  }
 
 void draw_line(int x0, int y0, int x1, int y1, short int color) {
   // 1.determine which axis is steeper
@@ -105,9 +118,9 @@ void draw_line(int x0, int y0, int x1, int y1, short int color) {
 
   for (int i = x0; i <= x1; i++) {
     if (unsigned_delta_x < unsigned_delta_y) {
-      plot_pixel(y, i, color);
+      draw_box(y, i, color);
     } else {
-      plot_pixel(i, y, color);
+      draw_box(i, y, color);
     }
     error = error + delta_y;
     if (error > 0) {
@@ -119,18 +132,66 @@ void draw_line(int x0, int y0, int x1, int y1, short int color) {
 
 // angle = pulse width -50
 
-int calculate_x(distance, angle) {
+// Helper function: Normalize angle (in radians) to [-PI, PI]
+double normalize_angle(double rad) {
+  while (rad > PI) {
+      rad -= 2 * PI;
+  }
+  while (rad < -PI) {
+      rad += 2 * PI;
+  }
+  return rad;
+}
+
+// Compute sine using Taylor series expansion.
+// sin(x) = x - x^3/3! + x^5/5! - x^7/7! + ...
+double sin_deg(double degrees) {
+  double rad = degrees * (PI / 180.0);
+  rad = normalize_angle(rad);
+  double term = rad;    // First term (x)
+  double sum = rad;     // Initialize sum with first term
+  int n;
+
+  // Use 10 terms for reasonable accuracy
+  for (n = 1; n < 10; n++) {
+      // Each term: -term * (rad^2) / ((2*n) * (2*n+1))
+      term = -term * rad * rad / ((2 * n) * (2 * n + 1));
+      sum += term;
+  }
+  return sum;
+}
+
+// Compute cosine using Taylor series expansion.
+// cos(x) = 1 - x^2/2! + x^4/4! - x^6/6! + ...
+double cos_deg(double degrees) {
+  double rad = degrees * (PI / 180.0);
+  rad = normalize_angle(rad);
+  double term = 1.0;    // First term (1)
+  double sum = 1.0;     // Initialize sum with first term
+  int n;
+
+  // Use 10 terms for reasonable accuracy
+  for (n = 1; n < 10; n++) {
+      // Each term: -term * (rad^2) / ((2*n-1) * (2*n))
+      term = -term * rad * rad / ((2 * n - 1) * (2 * n));
+      sum += term;
+  }
+  return sum;
+}
+
+
+int calculate_x(unsigned int distance, unsigned int angle) {
   // r=150; max 2 meters
   int x;
   if (distance >=200){distance = 200;}
-  x = (int)distance * 0.75 * cos(angle / 170 * PI) + 160;
+  x = (int)distance * 0.75 * cos_deg(angle) + 160;
   return x;
 }
 
-int calculate_y(distance, angle) {
+int calculate_y(unsigned int distance,unsigned int angle) {
   int y;
   if (distance >=200){distance = 200;}
-  y = (int)239 - distance * 0.75 * sin(angle / 170 * PI);
+  y = (int)239 - distance * 0.75 * sin_deg(angle);
   return y;
 }
 
@@ -218,7 +279,6 @@ int ultrasonic_compute_distance_cm() {
 #endif
 
 volatile int count = 0;
-volatile int count_rotate = 0;
 volatile int fbi = 1;
 // int count2 = 0;
 // double pwm_duty_ratio = 0.5; //default 50% duty ratio
@@ -250,17 +310,6 @@ void timer2_ISR() {
   // PWM generator
   count++;
   count %= TS;
-  count_rotate++;
-  count_rotate %= TS * 2;
-  if (!count_rotate) {
-
-    if (pulse_width <= 50) {
-      fbi = 1;
-    } else if (pulse_width >= 240) {
-      fbi = -1;
-    }
-    pulse_width += fbi;
-  }
   if (count < pulse_width) {
     // set corresponding pin to 1
     *jp1 |= (1 << Servo);
@@ -310,9 +359,9 @@ void timer2_init() {
 }
 
 int main() {
-  timer2_init();
-  timer2_start();
-  ultrasonic_init();
+  //timer2_init();
+  //timer2_start();
+  //ultrasonic_init();
   volatile int* seg_base = (int*)HEX3_HEX0_BASE;
   volatile int* jp1Base = (int*)JP1_BASE;
   *(jp1Base + 1) |= (1 << Servo);
@@ -320,10 +369,15 @@ int main() {
   volatile int* pixel_ctrl_ptr = (int*)0xFF203020;
   volatile int distance_x[170] = {0};
   volatile int distance_y[170] = {0};
+  for (int i = 0; i < 170; i ++){
+    distance_x[i] = 100 + (((rand() % 2) * 2) - 1) * (rand() % 100 + 1);
+    distance_y[i] = 100 + (((rand() % 2) * 2) - 1) * (rand() % 100 + 1);
+  }
+  
 
   /* set front pixel buffer to Buffer 1 */
   *(pixel_ctrl_ptr + 1) =
-      (int)&Buffer1;  // first store the address in the  back buffer
+      (int)0x02000000;  // first store the address in the  back buffer
   /* now, swap the front/back buffers, to set the front buffer location */
   wait_for_vsync();
   /* initialize a pointer to the pixel buffer, used by drawing functions */
@@ -331,18 +385,22 @@ int main() {
   clear_screen();  // pixel_buffer_start points to the pixel buffer
 
   /* set back pixel buffer to Buffer 2 */
-  *(pixel_ctrl_ptr + 1) = (int)&Buffer2;
+  *(pixel_ctrl_ptr + 1) = (int)0x08000000;
   pixel_buffer_start = *(pixel_ctrl_ptr + 1);  // we draw on the back buffer
   clear_screen();  // pixel_buffer_start points to the pixel buffer
 
   while (1) {
     unsigned int segDisplay = 0x0;
     int i = 0;
-    int dist;
+    unsigned int dist;
     int angle;
-    ultrasonic_send_wave();
-    distance = ultrasonic_compute_distance_cm();
-    dist = distance;
+    //ultrasonic_send_wave();
+    //distance = ultrasonic_compute_distance_cm();
+   // dist = distance;
+
+   dist = 100 + (((rand() % 2) * 2) - 1) * (rand() % 100 + 1);
+
+
     volatile int* led_base = 0xFF200000;
     *led_base ^= 0x1;
     while (i != 32) {
@@ -352,16 +410,31 @@ int main() {
       distance /= 10;
     }
     *seg_base = segDisplay;
+    
+    //control motor rotation
+    if (pulse_width <= 50) {
+      fbi = 1;
+    } else if (pulse_width >= 240) {
+      fbi = -1;
+    }
+    pulse_width += fbi;    
 
     angle = pulse_width - 50;
-    draw_line(160, 239, distance_x[angle], distance_y[angle], 0x0);
-    // short int color = boxColor[i];
-    draw_line(160, 239, calculate_x(dist, angle), calculate_y(dist, angle),
-               0xf800);
+
     distance_x[angle] = calculate_x(dist, angle);
     distance_y[angle] = calculate_y(dist, angle);
+
+    
+    //VGA update
+    for (int i = 0; i <= angle; i ++){
+      draw_line(160, 239, distance_x[i], distance_y[i], 0xffff);
+      draw_line(160, 239, distance_x[i], distance_y[i], 0x0);
+    }
+
+
     // code for updating the locations of boxes (not shown)
     wait_for_vsync();  // swap front and back buffers on VGA vertical sync
     pixel_buffer_start = *(pixel_ctrl_ptr + 1);  // new back buffer
   }
 }
+
