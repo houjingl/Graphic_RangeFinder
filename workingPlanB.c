@@ -33,6 +33,7 @@ void wait_for_vsync();
 void clear_screen();
 void swap(int* a, int* b);
 void draw_line(int x0, int y0, int x1, int y1, short int color);
+void draw_box(int x, int y, short int color);
 
 void plot_pixel(int x, int y, short int line_color) {
   volatile short int* one_pixel_address;
@@ -110,6 +111,24 @@ void swap(int* a, int* b) {
   *a = temp;
 }
 
+void draw_box(int x, int y, short int color){
+    plot_pixel(x, y, color);
+    plot_pixel(x, y - 1, color);
+    plot_pixel(x, y + 1, color);
+    plot_pixel(x + 1, y + 1, color);
+    plot_pixel(x + 1, y, color);
+    plot_pixel(x + 1, y - 1, color);
+    plot_pixel(x - 1, y + 1, color);
+    plot_pixel(x - 1, y, color);
+    plot_pixel(x - 1, y - 1, color);
+    plot_pixel(x + 2, y + 1, color);
+    plot_pixel(x + 2, y, color);
+    plot_pixel(x + 2, y - 1, color);
+    plot_pixel(x - 2, y + 1, color);
+    plot_pixel(x - 2, y, color);
+    plot_pixel(x - 2, y - 1, color);
+}
+
 void draw_line(int x0, int y0, int x1, int y1, short int color) {
   // 1.determine which axis is steeper
   // 2. if y steep, work along y, if x is steep, walk along x
@@ -149,9 +168,9 @@ void draw_line(int x0, int y0, int x1, int y1, short int color) {
 
   for (int i = x0; i <= x1; i++) {
     if (unsigned_delta_x < unsigned_delta_y) {
-      plot_pixel(y, i, color);
+      draw_box(y, i, color);
     } else {
-      plot_pixel(i, y, color);
+      draw_box(i, y, color);
     }
     error = error + delta_y;
     if (error > 0) {
@@ -159,6 +178,24 @@ void draw_line(int x0, int y0, int x1, int y1, short int color) {
       error = error - delta_x;
     }
   }
+}
+
+void draw_LiDAR_frame(){
+  for (int i = 0; i <= 180; i++){
+    int x1 = 155 * cos_taylor(i/180.0 * PI) + 160;
+    int y1 = 229 - 155 * sin_taylor(i/180.0 * PI);
+
+    int x2 = 75 * cos_taylor(i/180.0 * PI) + 160;
+    int y2 = 229 - 75 * sin_taylor(i/180.0 * PI);
+
+    draw_box(x1, y1, 0x07E0);
+    draw_box(x2, y2, 0x07E0);
+
+    if(i == 90 || i == 45 || i == 0 || i == 180 || i == 135){
+      draw_line(160, 229, x1, y1, 0x07E0);
+    }
+  }
+  
 }
 
 // angle = pulse width -50
@@ -232,7 +269,7 @@ void ultrasonic_send_wave() {
 int ultrasonic_compute_distance_cm() {
   volatile int* parallel_port1_base = (int*)JP1_BASE;
   volatile int* timer_base = (int*)TIMER1_BASE;
-  volatile int* store = 0x20000;
+ // volatile int* store = 0x20000;
   double distance = 0;
   while (((*parallel_port1_base & (1 << Echo)) >> Echo) ==
          0);  // wait when echo is not received;
@@ -244,8 +281,6 @@ int ultrasonic_compute_distance_cm() {
   unsigned int timer_current_high = *(timer_base + 5);
   ultrasonic_timer_stop();
   unsigned int timer_current = timer_current_low + (timer_current_high << 16);
-  *(store + 2) = timer_current;
-  *(store + 3) = *(timer_base + 2) + ((*(timer_base + 3) << 16));
   distance = ((0xFFFFFFFF - timer_current) / 100000000.0) * (170) * 100.0;
   // Distance in cm
   return (int)distance;
@@ -266,6 +301,7 @@ int ultrasonic_compute_distance_cm() {
 #define KEY_BASE 0xFF200050
 #define KEY_IRQ 18
 #endif
+
 
 volatile int count = 0;
 volatile int count_rotate = 0;
@@ -300,16 +336,6 @@ void timer2_ISR() {
   // PWM generator
   count++;
   count %= TS;
-  count_rotate++;
-  count_rotate %= TS * 2;
-  if (!count_rotate) {
-    if (pulse_width <= 50) {
-      fbi = 1;
-    } else if (pulse_width >= 230) {
-      fbi = -1;
-    }
-    pulse_width += fbi;
-  }
   if (count < pulse_width) {
     // set corresponding pin to 1
     *jp1 |= (1 << Servo);
@@ -364,6 +390,7 @@ int main() {
   ultrasonic_init();
   volatile int* seg_base = (int*)HEX3_HEX0_BASE;
   volatile int* jp1Base = (int*)JP1_BASE;
+  int angle_inc = 0;
   *(jp1Base + 1) |= (1 << Servo);
 
   volatile int* pixel_ctrl_ptr = (int*)0xFF203020;
@@ -371,19 +398,30 @@ int main() {
   pixel_buffer_start = *pixel_ctrl_ptr;
   *(pixel_ctrl_ptr + 1) = pixel_buffer_start;  // setting the back buffer to be
                                                // the same as front buffer
-
+  int angle = 0;
+  
   int distance_x[181] = {0};
   int distance_y[181] = {0};
 
+  for (int i = 0; i < 181; i ++){
+    distance_x[i] = 160;
+    distance_y[i] = 229;
+  }
+
+  double cos45 = cos_taylor(45/180.0 * PI);
+  double sin45 = sin_taylor(45/180.0 * PI);
+
   clear_screen();
+  draw_LiDAR_frame();
 
   while (1) {
     unsigned int segDisplay = 0x0;
     int i = 0;
     int dist;
-    int angle;
+    
     ultrasonic_send_wave();
     distance = ultrasonic_compute_distance_cm();
+    //distance = 50;
     dist = distance;
     volatile int* led_base = 0xFF200000;
     *led_base ^= 0x1;
@@ -393,16 +431,34 @@ int main() {
       i += 8;
       distance /= 10;
     }
+
     *seg_base = segDisplay;
+    if (angle <= 0) {
+      angle_inc = 1;
+    } else if (angle >= 180) {
+      angle_inc = -1;
+    }
+    angle += angle_inc;
+    pulse_width = angle + 50;
 
-    angle = pulse_width - 50;
     draw_line(160, 229, distance_x[angle], distance_y[angle], 0x0);
-
-    // short int color = boxColor[i];
-    draw_line(160, 229, calculate_x(dist, angle), calculate_y(dist, angle),
-              0xf800);
     distance_x[angle] = calculate_x(dist, angle);
     distance_y[angle] = calculate_y(dist, angle);
+    draw_box(75 * cos_taylor((angle - angle_inc)/180.0 * PI) + 160, 229 - 75 * sin_taylor((angle - angle_inc)/180.0 * PI), 0x07E0);
+
+    // short int color = boxColor[i];
+    draw_line(160, 229, distance_x[angle], distance_y[angle], 0xf800);
+
+    draw_box(75 * cos_taylor(angle/180.0 * PI) + 160, 229 - 75 * sin_taylor(angle/180.0 * PI), 0x07E0);
+    
+    draw_line(160, 229, 155 + 160, 229, 0x07E0);
+    draw_line(160, 229, 155 * cos45 + 160, 229 - 155 * sin45, 0x07E0);
+    draw_line(160, 229, 160, 229 - 155, 0x07E0);
+    draw_line(160, 229, 155 * (-1) * cos45 + 160, 229 - 155 * sin45, 0x07E0);
+    draw_line(160, 229, 155 * (-1) + 160, 229, 0x07E0);
+
+    
+    
     // code for updating the locations of boxes (not shown)
     wait_for_vsync();  // swap front and back buffers on VGA vertical sync
     pixel_buffer_start = *(pixel_ctrl_ptr + 1);  // new back buffer
