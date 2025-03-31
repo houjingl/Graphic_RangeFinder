@@ -1,0 +1,18 @@
+module PllClk_25(CLOCK_50, KEY, CLOCK);
+	input CLOCK_50;
+	input [0:0] KEY; //use KEY0 as resetn
+	output reg CLOCK;
+	wire resetn;
+	assign resetn = KEY[0];
+	always @(posedge CLOCK_50)
+	begin
+		if (resetn==0)
+		begin
+			CLOCK <=0;
+		end
+		else
+		begin
+			CLOCK <= ~CLOCK;
+		end
+	end
+endmodule
