@@ -1,0 +1,319 @@
+
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdint.h>
+
+//SCCB is the communication protocal used by OV7670. Very similiar to IIC.
+#ifndef JP2_BASE
+#define JP2_BASE                0xFF200070
+#endif
+#define SDA                     0
+#define SCL                     1
+#define OV7670_write_addr       0x42
+#define OV7670_read_addr        0x43
+
+void delay_us(unsigned int microseconds);
+void SCCB_port_init();
+uint8_t SCCB_Reg_Write(uint8_t data, uint8_t reg_addr);
+uint8_t SCCB_Reg_Read(uint8_t reg_addr);
+
+
+#define LED_base               0xff200000
+
+
+#ifndef JP2_BASE
+#define JP2_BASE                0xFF200070
+#endif
+
+#define XCLK_TIMER_BASE         0xFF202000
+#define JP2_IRQ                 28
+#define XCLK_IRQ                16 //Timer 1 IRQ
+
+#ifndef SDA
+#define SDA                     0
+#define SCL                     1
+#endif
+
+#define VSYNC                   2 //Vertical Sync: set to input
+#define HSYNC                   3 //Horizontal Sync: set to input
+#define PCLK                    4 //Pixel Clock: Set to input
+#define XCLK                    5 //Camera System Clock: Set to output, outputing a stable 16Mhz square wave
+#define RSTN                    6 //Set to output 0 -> reset all reg to default 1 -> Normal mode
+#define PWDN                    7 //Set to output 0 -> working 1 -> idle
+
+#define GETD7_D0                0xFF00  //Set to input
+                                        //connect D0 to Pin#D8 on the DE1_Soc, connect D7 to Pin#D15 on the DE1_Soc, connect the rest in sequence!!
+
+volatile int* sccb_JP2_port_addr = (int*) JP2_BASE;
+volatile int* ov7670_JP2_addr = (int*) JP2_BASE;
+
+void delay_us(unsigned int microseconds) 
+{
+    volatile unsigned int i;
+    while (microseconds--) {
+        // For a 100 MHz clock, ideally, you need ~100 cycles for 1µs delay.
+        // The following loop (with the NOP) is an approximation.
+        for (i = 0; i < 100; i++) {
+            __asm__("nop");
+        }
+    }
+}
+
+//SCCB SCL SDA basic setup
+void SCCB_port_init()
+{
+    *(sccb_JP2_port_addr + 1) |= (1 << SCL) | (1 << SDA); //set SDA and SCL to output
+}
+
+void SDA_set_high()
+{
+    *sccb_JP2_port_addr |= (1 << SDA);
+    delay_us(500); // 50 us delay
+}
+
+void SDA_set_low()
+{
+    *sccb_JP2_port_addr &= ~(1 << SDA);
+    delay_us(500);
+}
+
+void SCL_set_high()
+{
+    *sccb_JP2_port_addr |= (1 << SCL);
+    delay_us(500);
+}
+
+void SCL_set_low()
+{
+    *sccb_JP2_port_addr &= ~(1 << SCL);
+    delay_us(500);
+}
+
+void SDA_set(uint8_t vlevel)
+{
+    if(vlevel){
+        SDA_set_high();
+    } else {
+        SDA_set_low();
+    }
+}
+
+void SCL_set(uint8_t vlevel)
+{
+    if (vlevel){
+        SCL_set_high();
+    } else {
+        SCL_set_low();
+    }
+}
+
+//Setting SCCB comm functions
+void SCCB_start()
+{
+    //when SCL is high, drive SDA from High to low
+    //Drive SCL to low at the end of call
+    SDA_set_high();
+    SCL_set_high();
+    SDA_set_low();
+    SCL_set_low();
+}
+
+void SCCB_stop()
+{
+    //when SCL is high, drive SDA from low to high
+    //Drive SCL to high at the end of call
+    SDA_set_low();
+    SCL_set_high();
+    SDA_set_high();
+}
+
+void SCCB_sendNoAck()
+{
+    SDA_set_high();
+    SCL_set_high();
+    SCL_set_low();
+    SDA_set_low();
+}
+
+uint8_t SCCB_Read_Ack()
+{
+    *(sccb_JP2_port_addr + 1) &= ~(1 << SDA); //set SDA to input, release SDA line
+    SCL_set_high();
+    uint8_t ack = (*sccb_JP2_port_addr & (1 << SDA)) >> SDA;
+    SCL_set_low();
+    *(sccb_JP2_port_addr + 1) |= (1 << SDA); //reset SDA to output/////////////////////////////////////might have issue
+    return ack;
+}
+
+uint8_t SCCB_SendByte(uint8_t data)
+{
+    //SDA stable at SCL high, change at SCL low
+    //SCL is set to low at the end of each function, no need to config SCL level at the start
+    for (int i = 0; i < 8; i ++){
+        //set SDA
+        SDA_set((data >> i) & 0x1); //or data & (1 << i)
+        SCL_set_high();
+        SCL_set_low();
+    }
+    
+    return SCCB_Read_Ack();
+}
+
+uint8_t SCCB_ReadByte()
+{
+    *(sccb_JP2_port_addr + 1) &= ~(1 << SDA); //set SDA to input, release SDA line
+    uint8_t retByte = 0;
+    for (int i = 0; i < 8; i ++){
+        SCL_set_high();
+        if (*sccb_JP2_port_addr & (1 << SDA)) retByte |= (1 << i);
+        SCL_set_low();
+    }
+    *(sccb_JP2_port_addr + 1) |= (1 << SDA); 
+
+    return retByte;
+}
+
+uint8_t SCCB_Reg_Write(uint8_t data, uint8_t reg_addr)
+{
+    SCCB_start();
+    if(SCCB_SendByte(OV7670_write_addr)){
+        SCCB_stop();
+        return 0xFF; //0xFF indicates no ack from slave, comm fails
+    }
+    if(SCCB_SendByte(reg_addr)){
+        SCCB_stop();
+        return 0xFF; //0xFF indicates no ack from slave, comm fails
+    }
+    if(SCCB_SendByte(data)){
+        SCCB_stop();
+        return 0xFF; //0xFF indicates no ack from slave, comm fails
+    }
+    SCCB_stop();
+    return 0;
+}
+
+uint8_t SCCB_Reg_Read(uint8_t reg_addr)
+{   
+    uint8_t regContent = 0;
+    //SCCB read: two stages
+    //1 stage: write reg addr; 
+    SCCB_start();
+    if(SCCB_SendByte(OV7670_write_addr)){
+        SCCB_stop();
+        return 0xFF;
+    }
+    if(SCCB_SendByte(reg_addr)){
+        SCCB_stop();
+        return 0xFF;
+    }
+    SCCB_stop();
+
+    //2 stage: read reg content
+    SCCB_start();
+    if(SCCB_SendByte(OV7670_read_addr)){
+        SCCB_stop();
+        return 0xFF;
+    }
+    regContent = SCCB_ReadByte();
+    SCCB_sendNoAck();
+    SCCB_stop();
+    return regContent;
+}
+
+
+void ov7670_xclk_start()
+{
+    volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    *xclk_base = 0x0;
+    *(xclk_base + 1) = 0b0111;
+}
+
+void ov7670_xclk_stop()
+{
+    volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    *xclk_base = 0x0;
+    *(xclk_base + 1) = 0b1010;
+}
+
+void ov7670_xclk_ISR()
+{
+    ov7670_xclk_stop();
+    //volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    //toggle XCLK
+	volatile int* led_base = (int*) 0xff200000;
+	*ov7670_JP2_addr ^= (1 << XCLK);
+	*(led_base) ^= (1 << XCLK);
+    ov7670_xclk_start();
+}
+
+void __attribute__((interrupt("machine"))) ISR_HANDLER(void);
+
+void ov7670_interrupt_init()
+{
+    //interrupt device level set up
+    //setting XCLK
+    volatile int* xclk_base = (int*) XCLK_TIMER_BASE;
+    volatile int xclk_irq = XCLK_IRQ;
+    int xclk_timer1_content = 5; //every 5 clock cycles toggle
+    *(xclk_base + 2) = xclk_timer1_content;
+    *(xclk_base + 3) = 0x0;
+    ov7670_xclk_start();
+    
+    int mstatus_value, IRQ_value, mtvec_value;
+    mstatus_value = 0b1000; //disable global interrupt
+    __asm__ volatile ("csrc mstatus, %0" :: "r"(mstatus_value));
+
+    __asm__ volatile ("csrr %0, mie" : "=r"(IRQ_value));
+    IRQ_value |= (1 << XCLK_IRQ) | (1 << JP2_IRQ);
+    __asm__ volatile ("csrs mie, %0" :: "r"(IRQ_value));
+    //Loading mtvec in main
+    mtvec_value = (int) &ISR_HANDLER; //load mtvec
+    __asm__ volatile ("csrw mtvec, %0" :: "r"(mtvec_value));
+
+    //enable global interrupt
+    __asm__ volatile ("csrs mstatus, %0" :: "r"(mstatus_value));
+}
+
+void ov7670_init()
+{
+    //pins config
+    SCCB_port_init(); //init SCL and SDA to output pins
+    //uint32_t direction_reg_content = 0x0;
+    //Output is 1, input is 0
+    //configure output pins only
+    //direction_reg_content |= (1 << XCLK);
+    *(ov7670_JP2_addr + 1) |= (1 << XCLK);
+
+    //interrupt init
+    ov7670_interrupt_init();
+}
+
+
+
+int main(){
+    uint16_t pid = 0;
+    uint16_t mid = 0;
+
+    ov7670_init();
+    pid = (SCCB_Reg_Read(0x0A) << 8) | (SCCB_Reg_Read(0x0B));
+    mid = (SCCB_Reg_Read(0x1C) << 8) | (SCCB_Reg_Read(0x1D));
+    
+    volatile int* temp_store = (int*) 0x20000;
+    *(temp_store + 1) = pid;
+    *(temp_store + 2) = mid;
+    while (1){
+
+    }
+}
+
+void __attribute__((interrupt("machine"))) ISR_HANDLER(void) //declare this subroutine as an ISR
+{
+    int mcause_value = 0x0;
+    __asm__ volatile ("csrr %0, mcause" : "=r"(mcause_value));
+    if (mcause_value == (XCLK_IRQ + 0x80000000)){
+        ov7670_xclk_ISR();
+    }
+
+}
