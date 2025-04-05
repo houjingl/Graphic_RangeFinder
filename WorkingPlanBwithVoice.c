@@ -723,17 +723,17 @@ int main() {
     	audio->control = 0x8;
     	audio->control = 0x0;
     	int dist_A = 0;
-    for (int j=0; j<20; j++){
-    	dist_A += dist_arr[j];
-    }
+      for (int j=0; j<20; j++){
+    	  dist_A += dist_arr[j];
+      }
     	dist_A /= 20;
-    for (int i = 0; i < num_samples; i ++) {
+      for (int i = 0; i < num_samples; i ++) {
         // Wait until there is space in the FIFO
         while (audio->write_available == 0);
         // Write the sample to both channels
         audio->left_data = audio_samples[i] / dist_A;
         audio->right_data = audio_samples[i] / dist_A;
-    }
+      }
     
     }
         
